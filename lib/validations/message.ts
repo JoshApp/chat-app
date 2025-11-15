@@ -6,6 +6,7 @@ export const sendMessageSchema = z.object({
     .min(1, "Message cannot be empty")
     .max(5000, "Message is too long (max 5000 characters)"),
   conversationId: z.string().uuid("Invalid conversation ID"),
+  replyToMessageId: z.string().uuid("Invalid message ID").optional(),
 })
 
 export const reportUserSchema = z.object({

@@ -4,17 +4,35 @@ import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useNotifications } from "@/lib/contexts/notification-context"
+import { useTypingPresence } from "@/lib/hooks/use-typing-presence"
 import { MessageBubble, type MessageGroupPosition } from "./message-bubble"
 import { MessageInput } from "./message-input"
 import { type MessageReaction } from "./message-reactions"
+import { TypingIndicator } from "./typing-indicator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "./user-avatar"
 import { UsernameWithFlag } from "./username-with-flag"
 import { MoreVertical } from "lucide-react"
-import type { Message } from "@/lib/types/database"
+import type { Message, MessageWithSendState } from "@/lib/types/database"
 import { format, isToday, isYesterday, isSameDay } from "date-fns"
 import toast from "react-hot-toast"
+import { cn } from "@/lib/utils"
+
+function getGenderSymbol(gender: string): { symbol: string; color: string } | null {
+  switch (gender.toLowerCase()) {
+    case "female":
+    case "woman":
+      return { symbol: "♀", color: "text-pink-400" }
+    case "male":
+    case "man":
+      return { symbol: "♂", color: "text-blue-400" }
+    case "prefer_not_to_say":
+      return { symbol: "⚧", color: "text-purple-400" }
+    default:
+      return null
+  }
+}
 
 // Helper to determine message group position
 function getMessageGroupPosition(
@@ -90,15 +108,20 @@ interface ChatViewProps {
 export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
   const { user } = useAuth()
   const { markConversationAsRead, unreadCounts } = useNotifications()
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<MessageWithSendState[]>([])
   const [reactions, setReactions] = useState<Map<string, MessageReaction[]>>(new Map())
   const reactionsRef = useRef(reactions)
   const [loading, setLoading] = useState(true)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [newMessagesCount, setNewMessagesCount] = useState(0)
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const supabase = createClient()
+
+  // Use shared typing presence hook (single channel for both ChatView and MessageInput)
+  const { otherUserTyping, setTyping } = useTypingPresence(conversationId, user?.id)
 
   const unreadCount = unreadCounts.get(conversationId) || 0
 
@@ -137,7 +160,7 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
     markConversationAsRead(conversationId)
   }, [conversationId, markConversationAsRead])
 
-  // Subscribe to new messages
+  // Subscribe to new messages and message updates
   useEffect(() => {
     if (!conversationId) return
 
@@ -152,7 +175,51 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message])
+          const newMessage = payload.new as Message
+
+          setMessages((prev) => {
+            // Check if this is our optimistic message by matching content and sender
+            // (optimistic messages have clientId and might be in any send state)
+            const optimisticIndex = prev.findIndex(
+              (m) => m.clientId && m.sender_id === user?.id && m.content === newMessage.content
+            )
+
+            if (optimisticIndex !== -1) {
+              // Replace optimistic message with server message
+              const updated = [...prev]
+              updated[optimisticIndex] = { ...newMessage, sendState: 'sent' }
+              return updated
+            }
+
+            // Check if message already exists (prevent duplicates)
+            const existingIndex = prev.findIndex((m) => m.id === newMessage.id)
+            if (existingIndex !== -1) {
+              return prev // Message already exists, don't add duplicate
+            }
+
+            // Otherwise, add new message (from other user or another device)
+            return [...prev, { ...newMessage, sendState: 'sent' }]
+          })
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const updatedMessage = payload.new as Message
+
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === updatedMessage.id
+                ? { ...msg, read_at: updatedMessage.read_at }
+                : msg
+            )
+          )
         }
       )
       .subscribe()
@@ -160,7 +227,7 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
     return () => {
       channel.unsubscribe()
     }
-  }, [conversationId])
+  }, [conversationId, user?.id])
 
   // Fetch reactions for all messages
   useEffect(() => {
@@ -351,6 +418,106 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
     }
   }, [messages.length, showScrollButton])
 
+  // Scroll to a specific message by ID
+  const scrollToMessage = (messageId: string) => {
+    const messageElement = messageRefs.current.get(messageId)
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: "smooth", block: "center" })
+      // Highlight the message briefly
+      messageElement.classList.add("bg-primary/10")
+      setTimeout(() => {
+        messageElement.classList.remove("bg-primary/10")
+      }, 2000)
+    }
+  }
+
+  // Create a Map of messages for quick lookup (for resolving parent messages)
+  const messagesMap = new Map(messages.map((m) => [m.id, m]))
+
+  // Resolve parent message for a reply
+  const getParentMessage = (replyToMessageId: string | null): Message | null => {
+    if (!replyToMessageId) return null
+    return messagesMap.get(replyToMessageId) || null
+  }
+
+  // Add optimistic message (called from MessageInput)
+  const addOptimisticMessage = (content: string, replyToMessageId?: string) => {
+    if (!user) return null
+
+    const clientId = `client_${Date.now()}_${Math.random()}`
+    const optimisticMessage: MessageWithSendState = {
+      id: clientId,
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content,
+      created_at: new Date().toISOString(),
+      read_at: null,
+      reply_to_message_id: replyToMessageId || null,
+      sendState: 'sending',
+      clientId,
+    }
+
+    setMessages((prev) => [...prev, optimisticMessage])
+    return clientId
+  }
+
+  // Update message send state
+  const updateMessageState = (
+    clientId: string,
+    state: 'sent' | 'failed',
+    serverId?: string,
+    error?: string
+  ) => {
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.clientId === clientId) {
+          if (state === 'sent' && serverId) {
+            // Replace with server message
+            return { ...msg, id: serverId, sendState: 'sent', error: undefined }
+          }
+          return { ...msg, sendState: state, error }
+        }
+        return msg
+      })
+    )
+  }
+
+  // Retry failed message
+  const retryMessage = async (clientId: string) => {
+    const message = messages.find((m) => m.clientId === clientId)
+    if (!message) return
+
+    // Update to sending state
+    setMessages((prev) =>
+      prev.map((msg) => (msg.clientId === clientId ? { ...msg, sendState: 'sending', error: undefined } : msg))
+    )
+
+    try {
+      const response = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          content: message.content,
+          replyToMessageId: message.reply_to_message_id,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to send message")
+      }
+
+      const { message: sentMessage } = await response.json()
+      updateMessageState(clientId, 'sent', sentMessage.id)
+    } catch (error) {
+      console.error("Error retrying message:", error)
+      updateMessageState(clientId, 'failed', undefined, "Failed to send")
+      toast.error("Failed to send message")
+    }
+  }
+
+  const genderSymbol = getGenderSymbol(otherUser.gender)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -369,8 +536,12 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
               ←
             </Button>
           )}
-          <UserAvatar username={otherUser.username} size="md" />
-          <div>
+          <div className="relative">
+            <UserAvatar username={otherUser.username} size="md" />
+            {/* Online indicator - green dot on avatar */}
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />
+          </div>
+          <div className="flex flex-col gap-0.5">
             <div className="font-semibold">
               <UsernameWithFlag
                 username={otherUser.username}
@@ -378,8 +549,21 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
                 showFlag={otherUser.show_country_flag}
               />
             </div>
-            <div className="text-sm text-muted-foreground">
-              {otherUser.age} • {otherUser.gender === "prefer_not_to_say" ? "Prefer not to say" : otherUser.gender}
+            <div className="h-5 flex items-center">
+              {otherUserTyping ? (
+                <TypingIndicator username={otherUser.username} className="text-sm" />
+              ) : (
+                <div className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  {genderSymbol && (
+                    <span className={cn("font-semibold text-base", genderSymbol.color)}>
+                      {genderSymbol.symbol}
+                    </span>
+                  )}
+                  <span>
+                    {otherUser.age} • {otherUser.gender === "prefer_not_to_say" ? "Prefer not to say" : otherUser.gender}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -393,7 +577,7 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="h-full overflow-y-auto p-4"
+          className="h-full overflow-y-auto px-4 pt-4"
         >
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
@@ -430,6 +614,40 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
                       reactions={reactions.get(message.id) || []}
                       currentUserId={user?.id || ""}
                       onReactionToggle={handleReactionToggle}
+                      parentMessage={
+                        message.reply_to_message_id ? getParentMessage(message.reply_to_message_id) : undefined
+                      }
+                      parentMessageSenderName={
+                        message.reply_to_message_id
+                          ? getParentMessage(message.reply_to_message_id)?.sender_id === user?.id
+                            ? "You"
+                            : otherUser.username
+                          : undefined
+                      }
+                      onReply={() => setReplyToMessage(message)}
+                      onScrollToParent={
+                        message.reply_to_message_id
+                          ? () => scrollToMessage(message.reply_to_message_id!)
+                          : undefined
+                      }
+                      onReport={
+                        message.sender_id !== user?.id
+                          ? () => {
+                              // TODO: Open report dialog
+                              toast.error("Report feature coming soon")
+                            }
+                          : undefined
+                      }
+                      sendState={message.sendState}
+                      onRetry={message.clientId ? () => retryMessage(message.clientId!) : undefined}
+                      readAt={message.read_at}
+                      ref={(el) => {
+                        if (el) {
+                          messageRefs.current.set(message.id, el)
+                        } else {
+                          messageRefs.current.delete(message.id)
+                        }
+                      }}
                     />
                   </div>
                 )
@@ -452,8 +670,40 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
         )}
       </div>
 
+      {/* Reserved space for inline typing bubble - fixed height to prevent jumping */}
+      <div className="h-7 px-4 mb-1 flex items-start">
+        {otherUserTyping && (
+          <div className="flex justify-start animate-in fade-in duration-200">
+            <div className="px-3 py-2 rounded-xl bg-muted">
+              <div className="flex items-center gap-0.5">
+                <span
+                  className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce"
+                  style={{ animationDelay: "0ms", animationDuration: "1.4s" }}
+                />
+                <span
+                  className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce"
+                  style={{ animationDelay: "200ms", animationDuration: "1.4s" }}
+                />
+                <span
+                  className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce"
+                  style={{ animationDelay: "400ms", animationDuration: "1.4s" }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Input */}
-      <MessageInput conversationId={conversationId} />
+      <MessageInput
+        conversationId={conversationId}
+        replyToMessage={replyToMessage}
+        replyToUsername={replyToMessage?.sender_id === user?.id ? "You" : otherUser.username}
+        onCancelReply={() => setReplyToMessage(null)}
+        onAddOptimisticMessage={addOptimisticMessage}
+        onUpdateMessageState={updateMessageState}
+        onTypingChange={setTyping}
+      />
     </div>
   )
 }

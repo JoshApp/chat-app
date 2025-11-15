@@ -7,6 +7,9 @@ import { Send, Smile } from "lucide-react"
 import toast from "react-hot-toast"
 import dynamic from "next/dynamic"
 import type { EmojiClickData } from "emoji-picker-react"
+import type { Message } from "@/lib/types/database"
+import { ReplyPreview } from "./reply-preview"
+import { useAuth } from "@/lib/contexts/auth-context"
 
 // Dynamically import EmojiPicker to avoid SSR issues
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false })
@@ -14,15 +17,42 @@ const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false })
 interface MessageInputProps {
   conversationId: string
   onMessageSent?: () => void
+  replyToMessage?: Message | null
+  replyToUsername?: string
+  onCancelReply?: () => void
+  onAddOptimisticMessage?: (content: string, replyToMessageId?: string) => string | null
+  onUpdateMessageState?: (clientId: string, state: 'sent' | 'failed', serverId?: string, error?: string) => void
+  onTypingChange?: (isTyping: boolean) => void
 }
 
-export function MessageInput({ conversationId, onMessageSent }: MessageInputProps) {
+export function MessageInput({
+  conversationId,
+  onMessageSent,
+  replyToMessage,
+  replyToUsername,
+  onCancelReply,
+  onAddOptimisticMessage,
+  onUpdateMessageState,
+  onTypingChange,
+}: MessageInputProps) {
+  const { user } = useAuth()
   const [content, setContent] = useState("")
   const [sending, setSending] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [isTyping, setIsTyping] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
   const emojiButtonRef = useRef<HTMLButtonElement>(null)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Clean up typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Auto-grow textarea
   useEffect(() => {
@@ -65,9 +95,62 @@ export function MessageInput({ conversationId, onMessageSent }: MessageInputProp
     }
   }, [showEmojiPicker])
 
+  // Handle content change with typing indicator
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value
+    setContent(newContent)
+
+    // Don't track typing for empty input
+    if (!newContent.trim()) {
+      if (isTyping) {
+        onTypingChange?.(false)
+        setIsTyping(false)
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+      return
+    }
+
+    // Broadcast typing state
+    if (!isTyping) {
+      onTypingChange?.(true)
+      setIsTyping(true)
+    }
+
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+
+    // Auto-clear typing after 3 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      onTypingChange?.(false)
+      setIsTyping(false)
+    }, 3000)
+  }
+
   const handleSend = async () => {
     if (!content.trim() || sending) return
 
+    const messageContent = content.trim()
+    const replyToId = replyToMessage?.id
+
+    // Clear typing state
+    if (isTyping) {
+      onTypingChange?.(false)
+      setIsTyping(false)
+    }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+
+    // Add optimistic message immediately
+    const clientId = onAddOptimisticMessage?.(messageContent, replyToId)
+
+    // Clear input and reply state immediately for better UX
+    setContent("")
+    onCancelReply?.()
     setSending(true)
 
     try {
@@ -76,7 +159,8 @@ export function MessageInput({ conversationId, onMessageSent }: MessageInputProp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId,
-          content: content.trim(),
+          content: messageContent,
+          replyToMessageId: replyToId,
         }),
       })
 
@@ -84,10 +168,22 @@ export function MessageInput({ conversationId, onMessageSent }: MessageInputProp
         throw new Error("Failed to send message")
       }
 
-      setContent("")
+      const { message } = await response.json()
+
+      // Update optimistic message to sent state
+      if (clientId && onUpdateMessageState) {
+        onUpdateMessageState(clientId, 'sent', message.id)
+      }
+
       onMessageSent?.()
     } catch (error) {
       console.error("Error sending message:", error)
+
+      // Update optimistic message to failed state
+      if (clientId && onUpdateMessageState) {
+        onUpdateMessageState(clientId, 'failed', undefined, "Failed to send")
+      }
+
       toast.error("Failed to send message")
     } finally {
       setSending(false)
@@ -125,29 +221,39 @@ export function MessageInput({ conversationId, onMessageSent }: MessageInputProp
   }
 
   return (
-    <div className="border-t p-4 relative">
-      {/* Emoji Picker */}
-      {showEmojiPicker && (
-        <div
-          ref={emojiPickerRef}
-          className="absolute bottom-20 right-4 z-50"
-        >
-          <EmojiPicker
-            onEmojiClick={handleEmojiClick}
-            emojiStyle="twitter"
-            theme="dark"
-            width={350}
-            height={400}
-          />
-        </div>
+    <div className="border-t relative">
+      {/* Reply Preview */}
+      {replyToMessage && replyToUsername && onCancelReply && (
+        <ReplyPreview
+          message={replyToMessage}
+          senderName={replyToUsername}
+          onCancel={onCancelReply}
+        />
       )}
 
-      <div className="flex gap-2 items-end">
+      <div className="p-4">
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <div
+            ref={emojiPickerRef}
+            className="absolute bottom-20 right-4 z-50"
+          >
+            <EmojiPicker
+              onEmojiClick={handleEmojiClick}
+              emojiStyle="twitter"
+              theme="dark"
+              width={350}
+              height={400}
+            />
+          </div>
+        )}
+
+        <div className="flex gap-2 items-end">
         <Textarea
           ref={textareaRef}
           placeholder="Type a message..."
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={handleContentChange}
           onKeyDown={handleKeyDown}
           className="min-h-[60px] resize-none font-sans"
           style={{ overflow: content.length > 100 ? "auto" : "hidden" }}
@@ -175,10 +281,11 @@ export function MessageInput({ conversationId, onMessageSent }: MessageInputProp
         >
           <Send className="h-5 w-5" />
         </Button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Press Enter to send, Shift+Enter for new line
+        </p>
       </div>
-      <p className="text-xs text-muted-foreground mt-2">
-        Press Enter to send, Shift+Enter for new line
-      </p>
     </div>
   )
 }

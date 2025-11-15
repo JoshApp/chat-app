@@ -115,7 +115,6 @@ export default function AppPage() {
           show_country_flag: presenceUser.show_country_flag,
         },
       })
-      setActiveTab("messages")
 
       // Update URL
       router.push(`/app?conversation=${data.conversationId}`)

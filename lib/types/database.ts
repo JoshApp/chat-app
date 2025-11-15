@@ -87,6 +87,7 @@ export interface Database {
           content: string
           created_at: string
           read_at: string | null
+          reply_to_message_id: string | null
         }
         Insert: {
           id?: string
@@ -95,6 +96,7 @@ export interface Database {
           content: string
           created_at?: string
           read_at?: string | null
+          reply_to_message_id?: string | null
         }
         Update: {
           id?: string
@@ -103,6 +105,7 @@ export interface Database {
           content?: string
           created_at?: string
           read_at?: string | null
+          reply_to_message_id?: string | null
         }
       }
       blocks: {
@@ -180,3 +183,18 @@ export type Conversation = Database['public']['Tables']['conversations']['Row']
 export type Message = Database['public']['Tables']['messages']['Row']
 export type Block = Database['public']['Tables']['blocks']['Row']
 export type Report = Database['public']['Tables']['reports']['Row']
+
+// Message with resolved parent message for reply functionality
+export interface MessageWithReply extends Message {
+  replyToMessage?: Message | null
+}
+
+// Message send states for optimistic rendering
+export type MessageSendState = 'sending' | 'sent' | 'failed'
+
+// Message with send state tracking (for client-side optimistic updates)
+export interface MessageWithSendState extends Message {
+  sendState?: MessageSendState
+  clientId?: string // Temporary ID for optimistic messages
+  error?: string // Error message if failed
+}
