@@ -4,15 +4,19 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Users table
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  username TEXT UNIQUE NOT NULL,
+  username TEXT UNIQUE NOT NULL, -- Unique identifier (auto-generated)
+  display_name TEXT NOT NULL, -- User's chosen display name (may have suffix)
   email TEXT UNIQUE,
   password_hash TEXT,
   gender TEXT NOT NULL,
   age INTEGER NOT NULL CHECK (age >= 18),
   is_guest BOOLEAN DEFAULT true,
+  country_code CHAR(2), -- ISO 3166-1 alpha-2 country code from IP geolocation
+  show_country_flag BOOLEAN DEFAULT true, -- User preference for flag visibility
   age_verified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT country_code_is_uppercase_alpha2 CHECK (country_code IS NULL OR country_code ~ '^[A-Z]{2}$')
 );
 
 -- Conversations table
@@ -63,6 +67,8 @@ CREATE INDEX idx_conversations_user2 ON conversations(user2_id);
 CREATE INDEX idx_blocks_blocker ON blocks(blocker_id);
 CREATE INDEX idx_blocks_blocked ON blocks(blocked_id);
 CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_display_name ON users(display_name);
+CREATE INDEX idx_users_country_code ON users(country_code);
 
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -116,6 +122,17 @@ CREATE POLICY "Users can send messages to own conversations"
   WITH CHECK (
     auth.uid() = sender_id
     AND EXISTS (
+      SELECT 1 FROM conversations
+      WHERE conversations.id = messages.conversation_id
+      AND (conversations.user1_id = auth.uid() OR conversations.user2_id = auth.uid())
+    )
+  );
+
+-- Users can update messages in their conversations (for marking as read)
+CREATE POLICY "Users can update messages in own conversations"
+  ON messages FOR UPDATE
+  USING (
+    EXISTS (
       SELECT 1 FROM conversations
       WHERE conversations.id = messages.conversation_id
       AND (conversations.user1_id = auth.uid() OR conversations.user2_id = auth.uid())

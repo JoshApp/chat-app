@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { useNotifications } from "@/lib/contexts/notification-context"
 import { UserAvatar } from "./user-avatar"
+import { UsernameWithFlag } from "./username-with-flag"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDistanceToNow } from "date-fns"
 import type { Conversation, Message, User } from "@/lib/types/database"
+import { TwemojiText } from "@/components/ui/twemoji-text"
 
 interface ConversationWithDetails extends Conversation {
   other_user: User
@@ -19,6 +22,7 @@ interface ConversationsListProps {
 
 export function ConversationsList({ onConversationClick }: ConversationsListProps) {
   const { user } = useAuth()
+  const { unreadCounts } = useNotifications()
   const [conversations, setConversations] = useState<ConversationWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
@@ -158,32 +162,55 @@ export function ConversationsList({ onConversationClick }: ConversationsListProp
   return (
     <ScrollArea className="h-full">
       <div className="divide-y">
-        {conversations.map((conversation) => (
-          <button
-            key={conversation.id}
-            onClick={() => onConversationClick(conversation)}
-            className="w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors"
-          >
-            <UserAvatar username={conversation.other_user.username} size="md" />
-            <div className="flex-1 text-left min-w-0">
-              <div className="font-medium truncate">{conversation.other_user.username}</div>
-              {conversation.last_message ? (
-                <div className="text-sm text-muted-foreground truncate">
-                  {conversation.last_message.content}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">No messages yet</div>
+        {conversations.map((conversation) => {
+          const unreadCount = unreadCounts.get(conversation.id) || 0
+          const hasUnread = unreadCount > 0
+
+          return (
+            <button
+              key={conversation.id}
+              onClick={() => onConversationClick(conversation)}
+              className="w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors relative"
+            >
+              {/* Blue dot indicator for unread */}
+              {hasUnread && (
+                <div className="absolute left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-blue-500 rounded-full" />
               )}
-            </div>
-            {conversation.last_message && (
-              <div className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(conversation.last_message.created_at), {
-                  addSuffix: true,
-                })}
+
+              <UserAvatar username={conversation.other_user.display_name} size="md" />
+              <div className="flex-1 text-left min-w-0">
+                <div className={`truncate ${hasUnread ? "font-bold" : "font-medium"}`}>
+                  <UsernameWithFlag
+                    username={conversation.other_user.display_name}
+                    countryCode={conversation.other_user.country_code}
+                    showFlag={conversation.other_user.show_country_flag}
+                  />
+                </div>
+                {conversation.last_message ? (
+                  <div className={`text-sm truncate ${hasUnread ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                    <TwemojiText>{conversation.last_message.content}</TwemojiText>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">No messages yet</div>
+                )}
               </div>
-            )}
-          </button>
-        ))}
+              <div className="flex flex-col items-end gap-1">
+                {conversation.last_message && (
+                  <div className="text-xs text-muted-foreground whitespace-nowrap">
+                    {formatDistanceToNow(new Date(conversation.last_message.created_at), {
+                      addSuffix: true,
+                    })}
+                  </div>
+                )}
+                {hasUnread && (
+                  <div className="min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-blue-500 text-white text-xs font-bold rounded-full">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </div>
+                )}
+              </div>
+            </button>
+          )
+        })}
       </div>
     </ScrollArea>
   )

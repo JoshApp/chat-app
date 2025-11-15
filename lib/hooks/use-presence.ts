@@ -7,9 +7,12 @@ import type { RealtimeChannel } from "@supabase/supabase-js"
 
 export interface PresenceUser {
   user_id: string
-  username: string
+  username: string // Keep for backward compatibility temporarily
+  display_name: string
   gender: string
   age: number
+  country_code: string | null
+  show_country_flag: boolean
   online_at: string
 }
 
@@ -54,9 +57,12 @@ export function usePresence() {
           // Track this user's presence
           await presenceChannel.track({
             user_id: user.id,
-            username: user.username,
+            username: user.display_name, // For backward compatibility
+            display_name: user.display_name,
             gender: user.gender,
             age: user.age,
+            country_code: user.country_code,
+            show_country_flag: user.show_country_flag,
             online_at: new Date().toISOString(),
           })
         }

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "flag-icons/css/flag-icons.min.css";
 import { AuthProvider } from "@/lib/contexts/auth-context";
+import { NotificationProvider } from "@/lib/contexts/notification-context";
 import { Toaster } from "react-hot-toast";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -20,17 +22,19 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={inter.className}>
         <AuthProvider>
-          {children}
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              style: {
-                background: "#1f1f1f",
-                color: "#fff",
-                border: "1px solid #333",
-              },
-            }}
-          />
+          <NotificationProvider>
+            {children}
+            <Toaster
+              position="top-center"
+              toastOptions={{
+                style: {
+                  background: "#1f1f1f",
+                  color: "#fff",
+                  border: "1px solid #333",
+                },
+              }}
+            />
+          </NotificationProvider>
         </AuthProvider>
       </body>
     </html>

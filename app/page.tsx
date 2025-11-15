@@ -16,7 +16,7 @@ import Link from "next/link"
 export default function LandingPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [isLogin, setIsLogin] = useState(false)
+  const [authMode, setAuthMode] = useState<"guest" | "email-signup" | "email-login">("guest")
   const [showAgeModal, setShowAgeModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -75,11 +75,7 @@ export default function LandingPage() {
         throw new Error(data.error || "Failed to create account")
       }
 
-      if (data.username !== username) {
-        toast.success(`Welcome! Your username is ${data.username}`)
-      } else {
-        toast.success("Welcome! Redirecting to chat...")
-      }
+      toast.success("Welcome! Redirecting to chat...")
 
       // Refresh the page to pick up the new session
       window.location.href = "/app"
@@ -91,7 +87,54 @@ export default function LandingPage() {
     }
   }
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
+  const handleEmailSignup = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!ageConfirmed || !termsAccepted) {
+      toast.error("Please confirm you are 18+ and accept the terms")
+      return
+    }
+
+    if (parseInt(age) < 18) {
+      toast.error("You must be at least 18 years old")
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      const response = await fetch("/api/auth/email-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          email,
+          password,
+          gender,
+          age: parseInt(age),
+          ageConfirmed: true,
+          termsAccepted: true,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create account")
+      }
+
+      toast.success("Account created! Welcome!")
+
+      // Refresh the page to pick up the new session
+      window.location.href = "/app"
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create account")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!email || !password) {
@@ -102,37 +145,24 @@ export default function LandingPage() {
     setSubmitting(true)
 
     try {
-      const endpoint = isLogin ? "/api/auth/email-login" : "/api/auth/email-signup"
-      const payload = isLogin
-        ? { email, password }
-        : {
-            username,
-            email,
-            password,
-            gender,
-            age: parseInt(age),
-            ageConfirmed: true,
-            termsAccepted: true,
-          }
-
-      const response = await fetch(endpoint, {
+      const response = await fetch("/api/auth/email-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ email, password }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Authentication failed")
+        throw new Error(data.error || "Login failed")
       }
 
-      toast.success(isLogin ? "Welcome back!" : "Account created!")
+      toast.success("Welcome back!")
 
       // Refresh the page to pick up the new session
       window.location.href = "/app"
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Authentication failed")
+      toast.error(error instanceof Error ? error.message : "Login failed")
     } finally {
       setSubmitting(false)
     }
@@ -198,7 +228,7 @@ export default function LandingPage() {
         {/* Right Side - Auth Form */}
         <div className="flex-1 flex items-center justify-center p-8 lg:p-16 bg-muted/30">
           <div className="w-full max-w-md">
-            {!isLogin ? (
+            {authMode === "guest" ? (
               /* Guest Signup Form */
               <Card>
                 <CardHeader>
@@ -244,7 +274,7 @@ export default function LandingPage() {
                         <SelectTrigger>
                           <SelectValue placeholder="Select your age" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-h-[300px]">
                           {Array.from({ length: 83 }, (_, i) => i + 18).map((ageNum) => (
                             <SelectItem key={ageNum} value={ageNum.toString()}>
                               {ageNum}
@@ -293,15 +323,172 @@ export default function LandingPage() {
                       {submitting ? "Creating account..." : "Continue as Guest"}
                     </Button>
 
-                    <div className="text-center text-sm text-muted-foreground">
-                      Already have an account?{" "}
-                      <button
-                        type="button"
-                        onClick={() => setIsLogin(true)}
-                        className="text-primary hover:underline"
-                      >
-                        Login with email
-                      </button>
+                    <div className="text-center space-y-2">
+                      <div className="text-sm text-muted-foreground">
+                        Want to save your account?{" "}
+                        <button
+                          type="button"
+                          onClick={() => setAuthMode("email-signup")}
+                          className="text-primary hover:underline"
+                        >
+                          Sign up with email
+                        </button>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Already have an account?{" "}
+                        <button
+                          type="button"
+                          onClick={() => setAuthMode("email-login")}
+                          className="text-primary hover:underline"
+                        >
+                          Login
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            ) : authMode === "email-signup" ? (
+              /* Email Signup Form */
+              <Card>
+                <CardHeader>
+                  <CardTitle>Create an Account</CardTitle>
+                  <CardDescription>
+                    Sign up with email to save your account across devices
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleEmailSignup} className="space-y-4">
+                    <div>
+                      <Label htmlFor="username">Username</Label>
+                      <Input
+                        id="username"
+                        type="text"
+                        placeholder="Choose a username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                        minLength={3}
+                        maxLength={20}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="Create a password (min 6 characters)"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        minLength={6}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="gender">Gender</Label>
+                      <Select value={gender} onValueChange={setGender} required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                          <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="age">Age</Label>
+                      <Select value={age} onValueChange={setAge} required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your age" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {Array.from({ length: 83 }, (_, i) => i + 18).map((ageNum) => (
+                            <SelectItem key={ageNum} value={ageNum.toString()}>
+                              {ageNum}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          id="age-confirm-email"
+                          checked={ageConfirmed}
+                          onChange={(e) => setAgeConfirmed(e.target.checked)}
+                          className="mt-1"
+                        />
+                        <Label htmlFor="age-confirm-email" className="text-sm font-normal">
+                          I confirm I am 18 years or older
+                        </Label>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          id="terms-email"
+                          checked={termsAccepted}
+                          onChange={(e) => setTermsAccepted(e.target.checked)}
+                          className="mt-1"
+                        />
+                        <Label htmlFor="terms-email" className="text-sm font-normal">
+                          I accept the{" "}
+                          <Link href="/terms" className="text-primary hover:underline">
+                            Terms of Service
+                          </Link>{" "}
+                          and{" "}
+                          <Link href="/privacy" className="text-primary hover:underline">
+                            Privacy Policy
+                          </Link>
+                        </Label>
+                      </div>
+                    </div>
+
+                    <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+                      {submitting ? "Creating account..." : "Create Account"}
+                    </Button>
+
+                    <div className="text-center space-y-2">
+                      <div className="text-sm text-muted-foreground">
+                        Already have an account?{" "}
+                        <button
+                          type="button"
+                          onClick={() => setAuthMode("email-login")}
+                          className="text-primary hover:underline"
+                        >
+                          Login
+                        </button>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Prefer to stay anonymous?{" "}
+                        <button
+                          type="button"
+                          onClick={() => setAuthMode("guest")}
+                          className="text-primary hover:underline"
+                        >
+                          Continue as guest
+                        </button>
+                      </div>
                     </div>
                   </form>
                 </CardContent>
@@ -314,7 +501,7 @@ export default function LandingPage() {
                   <CardDescription>Login with your email and password</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleEmailAuth} className="space-y-4">
+                  <form onSubmit={handleEmailLogin} className="space-y-4">
                     <div>
                       <Label htmlFor="email">Email</Label>
                       <Input
@@ -344,15 +531,27 @@ export default function LandingPage() {
                       {submitting ? "Logging in..." : "Login"}
                     </Button>
 
-                    <div className="text-center text-sm text-muted-foreground">
-                      Don't have an account?{" "}
-                      <button
-                        type="button"
-                        onClick={() => setIsLogin(false)}
-                        className="text-primary hover:underline"
-                      >
-                        Continue as guest
-                      </button>
+                    <div className="text-center space-y-2">
+                      <div className="text-sm text-muted-foreground">
+                        Don't have an account?{" "}
+                        <button
+                          type="button"
+                          onClick={() => setAuthMode("email-signup")}
+                          className="text-primary hover:underline"
+                        >
+                          Sign up with email
+                        </button>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Or{" "}
+                        <button
+                          type="button"
+                          onClick={() => setAuthMode("guest")}
+                          className="text-primary hover:underline"
+                        >
+                          continue as guest
+                        </button>
+                      </div>
                     </div>
                   </form>
                 </CardContent>

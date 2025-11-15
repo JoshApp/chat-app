@@ -13,11 +13,14 @@ export interface Database {
         Row: {
           id: string
           username: string
+          display_name: string
           email: string | null
           password_hash: string | null
           gender: string
           age: number
           is_guest: boolean
+          country_code: string | null
+          show_country_flag: boolean
           age_verified_at: string
           last_seen_at: string
           created_at: string
@@ -25,11 +28,14 @@ export interface Database {
         Insert: {
           id?: string
           username: string
+          display_name: string
           email?: string | null
           password_hash?: string | null
           gender: string
           age: number
           is_guest?: boolean
+          country_code?: string | null
+          show_country_flag?: boolean
           age_verified_at?: string
           last_seen_at?: string
           created_at?: string
@@ -37,11 +43,14 @@ export interface Database {
         Update: {
           id?: string
           username?: string
+          display_name?: string
           email?: string | null
           password_hash?: string | null
           gender?: string
           age?: number
           is_guest?: boolean
+          country_code?: string | null
+          show_country_flag?: boolean
           age_verified_at?: string
           last_seen_at?: string
           created_at?: string
@@ -77,6 +86,7 @@ export interface Database {
           sender_id: string
           content: string
           created_at: string
+          read_at: string | null
         }
         Insert: {
           id?: string
@@ -84,6 +94,7 @@ export interface Database {
           sender_id: string
           content: string
           created_at?: string
+          read_at?: string | null
         }
         Update: {
           id?: string
@@ -91,6 +102,7 @@ export interface Database {
           sender_id?: string
           content?: string
           created_at?: string
+          read_at?: string | null
         }
       }
       blocks: {

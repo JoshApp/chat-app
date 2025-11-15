@@ -1,11 +1,14 @@
 import { z } from "zod"
 
+// Display name validation - non-unique, user's chosen name
+const displayNameSchema = z
+  .string()
+  .min(3, "Display name must be at least 3 characters")
+  .max(20, "Display name must be at most 20 characters")
+  .regex(/^[a-zA-Z0-9_]+$/, "Display name can only contain letters, numbers, and underscores")
+
 export const guestSignupSchema = z.object({
-  username: z
-    .string()
-    .min(3, "Username must be at least 3 characters")
-    .max(20, "Username must be at most 20 characters")
-    .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
+  username: displayNameSchema, // Will become display_name in the database
   gender: z.enum(["male", "female", "other", "prefer_not_to_say"], {
     required_error: "Please select a gender",
   }),
@@ -28,11 +31,7 @@ export const emailLoginSchema = z.object({
 })
 
 export const emailSignupSchema = z.object({
-  username: z
-    .string()
-    .min(3, "Username must be at least 3 characters")
-    .max(20, "Username must be at most 20 characters")
-    .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
+  username: displayNameSchema, // Will become display_name in the database
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   gender: z.enum(["male", "female", "other", "prefer_not_to_say"], {
@@ -60,7 +59,12 @@ export const upgradeAccountSchema = z.object({
   path: ["confirmPassword"],
 })
 
+export const updateDisplayNameSchema = z.object({
+  displayName: displayNameSchema,
+})
+
 export type GuestSignupInput = z.infer<typeof guestSignupSchema>
 export type EmailLoginInput = z.infer<typeof emailLoginSchema>
 export type EmailSignupInput = z.infer<typeof emailSignupSchema>
 export type UpgradeAccountInput = z.infer<typeof upgradeAccountSchema>
+export type UpdateDisplayNameInput = z.infer<typeof updateDisplayNameSchema>

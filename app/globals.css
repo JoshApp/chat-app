@@ -144,5 +144,6 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: Inter, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
   }
 }

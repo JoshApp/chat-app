@@ -25,6 +25,8 @@ const colors = [
 ]
 
 function getColorForUsername(username: string): string {
+  if (!username) return colors[0]
+
   let hash = 0
   for (let i = 0; i < username.length; i++) {
     hash = username.charCodeAt(i) + ((hash << 5) - hash)
@@ -33,6 +35,7 @@ function getColorForUsername(username: string): string {
 }
 
 function getInitials(username: string): string {
+  if (!username) return "??"
   return username.substring(0, 2).toUpperCase()
 }
 
