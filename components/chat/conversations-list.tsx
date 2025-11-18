@@ -155,9 +155,9 @@ export function ConversationsList({ onConversationClick }: ConversationsListProp
         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
           <MessageSquare className="w-8 h-8 text-primary/60" />
         </div>
-        <p className="text-lg font-semibold mb-1">No conversations yet</p>
+        <p className="text-lg font-semibold mb-1">No chats yet</p>
         <p className="text-xs text-muted-foreground max-w-sm">
-          Head to Discover to find someone who vibes with you. When you both spark, you can chat here
+          Find someone in Discover. Mutual sparks unlock chat
         </p>
       </div>
     )
@@ -181,33 +181,29 @@ export function ConversationsList({ onConversationClick }: ConversationsListProp
                 <div className="absolute left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-blue-500 rounded-full" />
               )}
 
-              <UserAvatar username={conversation.other_user.display_name} size="md" />
+              <UserAvatar username={conversation.other_user.display_name} size="sm" className="w-10 h-10" />
               <div className="flex-1 text-left min-w-0">
-                <div className={`truncate ${hasUnread ? "font-bold" : "font-medium"}`}>
-                  <UsernameWithFlag
-                    username={conversation.other_user.display_name}
-                    countryCode={conversation.other_user.country_code}
-                    showFlag={conversation.other_user.show_country_flag}
-                  />
+                <div className={`truncate text-sm ${hasUnread ? "font-bold" : "font-medium"}`}>
+                  {conversation.other_user.display_name}
                 </div>
                 {conversation.last_message ? (
-                  <div className={`text-sm truncate ${hasUnread ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                  <div className={`text-xs truncate ${hasUnread ? "text-foreground font-medium" : "text-muted-foreground"}`}>
                     <TwemojiText>{conversation.last_message.content}</TwemojiText>
                   </div>
                 ) : (
-                  <div className="text-sm text-muted-foreground">No messages yet</div>
+                  <div className="text-xs text-muted-foreground">No messages yet</div>
                 )}
               </div>
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                 {conversation.last_message && (
-                  <div className="text-xs text-muted-foreground whitespace-nowrap">
+                  <div className="text-[10px] text-muted-foreground whitespace-nowrap">
                     {formatDistanceToNow(new Date(conversation.last_message.created_at), {
                       addSuffix: true,
-                    })}
+                    }).replace(' ago', '')}
                   </div>
                 )}
                 {hasUnread && (
-                  <div className="min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-blue-500 text-white text-xs font-bold rounded-full">
+                  <div className="min-w-[18px] h-4 px-1 flex items-center justify-center bg-blue-500 text-white text-[10px] font-bold rounded-full">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </div>
                 )}

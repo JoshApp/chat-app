@@ -159,30 +159,36 @@ export function LobbyFilters({
 
   if (collapsible) {
     return (
-      <Card className={className}>
-        <div className="p-3">
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="w-full flex items-center justify-between text-left"
-          >
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold">Filters</h3>
-              {hasActiveFilters && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                  Active
-                </Badge>
-              )}
-            </div>
-            {isExpanded ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
-          </button>
+      <div className={cn("relative", className)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="h-8 text-xs gap-1.5"
+        >
+          Filters
+          {hasActiveFilters && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-1">
+              {[
+                filters.vibe !== "all" && "1",
+                filters.interests.length > 0 && filters.interests.length,
+                (filters.minAge !== 18 || filters.maxAge !== 100) && "1"
+              ].filter(Boolean).reduce((a, b) => Number(a) + Number(b), 0)}
+            </Badge>
+          )}
+          {isExpanded ? (
+            <ChevronUp className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5" />
+          )}
+        </Button>
 
-          {isExpanded && <div className="mt-3">{filterContent}</div>}
-        </div>
-      </Card>
+        {isExpanded && (
+          <Card className="absolute right-0 top-full mt-2 z-50 w-80 shadow-lg">
+            <div className="p-3">{filterContent}</div>
+          </Card>
+        )}
+      </div>
     )
   }
 

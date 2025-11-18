@@ -115,14 +115,19 @@ export function DiscoverFeed({
           <p className="text-xs text-muted-foreground mt-0.5">Find your vibe and make connections</p>
         </div>
 
-        <div className="space-y-3 py-3">
+        <div className="py-4">
           {/* Sparks Carousel (Horizontal) */}
-          <SparksCarousel
-            mutualSparks={mutualSparks}
-            incomingSparks={incomingSparks}
-            onMutualClick={onStartChat}
-            onIncomingClick={handleIncomingSparkClick}
-          />
+          {(mutualSparks.length > 0 || incomingSparks.length > 0) && (
+            <>
+              <SparksCarousel
+                mutualSparks={mutualSparks}
+                incomingSparks={incomingSparks}
+                onMutualClick={onStartChat}
+                onIncomingClick={handleIncomingSparkClick}
+              />
+              <div className="my-4 border-t border-border" />
+            </>
+          )}
 
           {/* Online Users Section */}
           <OnlineUsersSection

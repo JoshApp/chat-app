@@ -305,7 +305,7 @@ export default function AppPage() {
           <div
             className={cn(
               "flex-1 border-r",
-              activeTab === "chat" && "lg:w-80 lg:flex-none",
+              activeTab === "chat" && "lg:w-56 lg:flex-none",
               activeTab === "discover" && "lg:max-w-4xl",
               isMobileView && showChat && "hidden"
             )}

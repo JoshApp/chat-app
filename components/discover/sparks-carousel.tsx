@@ -28,8 +28,8 @@ export function SparksCarousel({
 
   return (
     <div className="mb-4">
-      <div className="flex items-center gap-2 mb-3 px-4">
-        <Sparkles className="w-4 h-4 text-primary" />
+      <div className="flex items-center gap-2 mb-3 px-4 pb-2 border-b border-primary/20">
+        <span className="text-base">🔥</span>
         <h3 className="text-sm font-semibold">
           {mutualSparks.length > 0 && incomingSparks.length > 0
             ? "Sparks"
@@ -37,7 +37,7 @@ export function SparksCarousel({
             ? "Mutual Sparks"
             : "Incoming Sparks"}
         </h3>
-        <Badge variant="secondary" className="text-xs">
+        <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
           {totalSparks}
         </Badge>
       </div>
@@ -61,7 +61,7 @@ export function SparksCarousel({
                 )}
               >
                 {/* Mutual badge */}
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center border-2 border-background">
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center border-2 border-background animate-pulse">
                   <span className="text-xs">💫</span>
                 </div>
 

@@ -104,9 +104,9 @@ export function OnlineUsersSection({ onlineUsers, onUserClick }: OnlineUsersSect
         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
           <Users className="w-8 h-8 text-primary/60" />
         </div>
-        <p className="text-lg font-semibold mb-1">No one's here right now</p>
+        <p className="text-lg font-semibold mb-1">Nobody's here yet</p>
         <p className="text-xs text-muted-foreground max-w-sm">
-          The vibe room is empty at the moment. Check back soon - someone interesting might just show up
+          Check back soon — someone interesting might show up
         </p>
       </div>
     )
@@ -114,18 +114,16 @@ export function OnlineUsersSection({ onlineUsers, onUserClick }: OnlineUsersSect
 
   return (
     <div className="px-4">
-      <div className="mb-3 pb-2 border-b border-primary/20">
+      <div className="mb-3 pb-2 border-b border-primary/20 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-primary" />
+          <span className="text-base">🌍</span>
           <h3 className="text-sm font-semibold">Everyone online</h3>
           <span className="text-xs text-muted-foreground">
-            {filteredUsers.length} {filteredUsers.length === 1 ? "person" : "people"}
+            {filteredUsers.length} online now
           </span>
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="mb-3">
+        {/* Filters Toggle */}
         <LobbyFilters
           filters={filters}
           onFiltersChange={setFilters}

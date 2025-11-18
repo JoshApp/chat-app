@@ -30,50 +30,26 @@ export function UserProfileCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden transition-all duration-200",
+        "group relative overflow-hidden transition-all duration-300 rounded-lg",
         "bg-gradient-to-br from-background to-muted/20",
-        !isCurrentUser && "cursor-pointer hover:shadow-lg hover:border-primary/40 hover:-translate-y-1",
+        !isCurrentUser && "cursor-pointer hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-primary/20 hover:border-primary/40 hover:scale-[1.02]",
         isCurrentUser && "opacity-70 cursor-default border-primary/20",
-        sparkStatus === "mutual" && "border-primary/50 bg-gradient-to-br from-primary/5 to-background",
+        sparkStatus === "mutual" && "border-primary/50 bg-gradient-to-br from-primary/5 to-background shadow-sm shadow-primary/10",
         sparkStatus === "received" && "border-primary/30",
         className
       )}
       onClick={() => !isCurrentUser && onClick()}
     >
-      {/* Spark Status Badge (Top Right) */}
-      {sparkStatus && (
-        <div className="absolute top-3 right-3 z-10">
-          {sparkStatus === "mutual" && (
-            <Badge className="bg-primary/20 text-primary border-primary/50 gap-1">
-              <Sparkles className="w-3 h-3" />
-              <span>Mutual</span>
-            </Badge>
-          )}
-          {sparkStatus === "received" && (
-            <Badge variant="outline" className="border-primary/50 text-primary gap-1">
-              <Sparkles className="w-3 h-3" />
-              <span>Sparked you</span>
-            </Badge>
-          )}
-          {sparkStatus === "sent" && (
-            <Badge variant="secondary" className="gap-1">
-              <Sparkles className="w-3 h-3" />
-              <span>You sparked</span>
-            </Badge>
-          )}
-        </div>
-      )}
-
-      <div className="p-4 space-y-2">
-        {/* Line 1: Avatar + Name/Age inline */}
-        <div className="flex items-center gap-3">
+      <div className="p-4 flex flex-col h-full">
+        {/* Top section: Avatar + Name/Age horizontal */}
+        <div className="flex items-start gap-3 mb-3">
           <div className="relative flex-shrink-0">
-            <UserAvatar username={user.display_name} size="md" className="w-12 h-12" />
+            <UserAvatar username={user.display_name} size="lg" className="w-16 h-16" />
             {/* Online indicator */}
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />
+            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-background rounded-full" />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
+          <div className="flex-1 min-w-0 pt-1">
+            <div className="flex items-center gap-1.5 mb-0.5">
               <UsernameWithFlag
                 username={user.display_name}
                 countryCode={user.country_code}
@@ -81,34 +57,53 @@ export function UserProfileCard({
                 className="font-semibold text-base truncate"
               />
               {isPremium && (
-                <Crown className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                <Crown className="w-4 h-4 text-yellow-500 flex-shrink-0" />
               )}
             </div>
-            <p className="text-xs text-muted-foreground">{user.age} years old</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground">{user.age} years</span>
+              {user.vibe && <VibeBadge vibe={user.vibe} size="sm" />}
+            </div>
           </div>
         </div>
 
-        {/* Line 2: Vibe + Interests inline */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {user.vibe && <VibeBadge vibe={user.vibe} size="sm" />}
-          {user.interests && user.interests.length > 0 && (
-            <InterestTagList tags={user.interests} maxVisible={3} size="sm" />
-          )}
-        </div>
-
-        {/* Line 3: Status line (optional) */}
+        {/* Status line */}
         {user.status_line && (
-          <p className="text-xs text-muted-foreground italic line-clamp-1">
+          <p className="text-xs text-muted-foreground italic line-clamp-1 mb-2">
             "{user.status_line}"
           </p>
         )}
 
-        {/* Current User Badge */}
-        {isCurrentUser && (
-          <Badge variant="outline" className="border-primary/50 text-primary text-xs">
-            This is you
-          </Badge>
+        {/* Interests */}
+        {user.interests && user.interests.length > 0 && (
+          <div className="mb-auto">
+            <InterestTagList tags={user.interests} maxVisible={2} size="sm" />
+          </div>
         )}
+
+        {/* Footer: Spark status or current user badge */}
+        <div className="mt-3 pt-3 border-t border-border">
+          {isCurrentUser ? (
+            <Badge variant="outline" className="border-primary/50 text-primary text-xs">
+              This is you
+            </Badge>
+          ) : sparkStatus === "mutual" ? (
+            <div className="flex items-center gap-1.5 text-primary">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">Mutual spark</span>
+            </div>
+          ) : sparkStatus === "received" ? (
+            <div className="flex items-center gap-1.5 text-primary">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">Sparked you</span>
+            </div>
+          ) : sparkStatus === "sent" ? (
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="text-xs">Spark sent</span>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* Hover overlay effect */}
