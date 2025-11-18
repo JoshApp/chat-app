@@ -11,9 +11,7 @@ export const sendMessageSchema = z.object({
 
 export const reportUserSchema = z.object({
   reportedId: z.string().uuid("Invalid user ID"),
-  reason: z.enum(["spam", "underage", "harassment", "inappropriate", "other"], {
-    required_error: "Please select a reason",
-  }),
+  reason: z.enum(["spam", "underage", "harassment", "inappropriate", "other"]),
   details: z.string().max(1000, "Details are too long (max 1000 characters)").optional(),
 })
 

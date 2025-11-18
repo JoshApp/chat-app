@@ -19,21 +19,6 @@ import { format, isToday, isYesterday, isSameDay } from "date-fns"
 import toast from "react-hot-toast"
 import { cn } from "@/lib/utils"
 
-function getGenderSymbol(gender: string): { symbol: string; color: string } | null {
-  switch (gender.toLowerCase()) {
-    case "female":
-    case "woman":
-      return { symbol: "♀", color: "text-pink-400" }
-    case "male":
-    case "man":
-      return { symbol: "♂", color: "text-blue-400" }
-    case "prefer_not_to_say":
-      return { symbol: "⚧", color: "text-purple-400" }
-    default:
-      return null
-  }
-}
-
 // Helper to determine message group position
 function getMessageGroupPosition(
   messages: Message[],
@@ -98,7 +83,7 @@ interface ChatViewProps {
     id: string
     username: string
     age: number
-    gender: string
+    vibe?: string | null
     country_code: string | null
     show_country_flag: boolean
   }
@@ -516,8 +501,6 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
     }
   }
 
-  const genderSymbol = getGenderSymbol(otherUser.gender)
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -529,7 +512,7 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="border-b p-4 flex items-center justify-between">
+      <div className="border-b p-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {onBack && (
             <Button variant="ghost" size="icon" onClick={onBack} className="lg:hidden">
@@ -554,13 +537,8 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
                 <TypingIndicator username={otherUser.username} className="text-sm" />
               ) : (
                 <div className="text-sm text-muted-foreground flex items-center gap-1.5">
-                  {genderSymbol && (
-                    <span className={cn("font-semibold text-base", genderSymbol.color)}>
-                      {genderSymbol.symbol}
-                    </span>
-                  )}
                   <span>
-                    {otherUser.age} • {otherUser.gender === "prefer_not_to_say" ? "Prefer not to say" : otherUser.gender}
+                    {otherUser.age} years old
                   </span>
                 </div>
               )}
@@ -577,7 +555,7 @@ export function ChatView({ conversationId, otherUser, onBack }: ChatViewProps) {
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="h-full overflow-y-auto px-4 pt-4"
+          className="h-full overflow-y-auto px-3 pt-3"
         >
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">

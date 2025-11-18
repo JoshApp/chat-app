@@ -7,22 +7,30 @@ const displayNameSchema = z
   .max(20, "Display name must be at most 20 characters")
   .regex(/^[a-zA-Z0-9_]+$/, "Display name can only contain letters, numbers, and underscores")
 
+// Vibe validation
+const vibeSchema = z.enum(["soft", "flirty", "spicy", "intense"])
+
+// Interest tags validation
+const interestTagsSchema = z.array(z.string()).max(3, "You can select up to 3 interests")
+
+// Status line validation
+const statusLineSchema = z
+  .string()
+  .max(100, "Status must be at most 100 characters")
+  .optional()
+
 export const guestSignupSchema = z.object({
   username: displayNameSchema, // Will become display_name in the database
-  gender: z.enum(["male", "female", "other", "prefer_not_to_say"], {
-    required_error: "Please select a gender",
-  }),
   age: z
-    .number({ required_error: "Please select your age" })
+    .number()
     .int()
     .min(18, "You must be at least 18 years old")
     .max(100, "Please enter a valid age"),
-  ageConfirmed: z.literal(true, {
-    errorMap: () => ({ message: "You must confirm you are 18 or older" }),
-  }),
-  termsAccepted: z.literal(true, {
-    errorMap: () => ({ message: "You must accept the terms of service" }),
-  }),
+  vibe: vibeSchema,
+  interests: interestTagsSchema.optional(),
+  statusLine: statusLineSchema,
+  ageConfirmed: z.literal(true),
+  termsAccepted: z.literal(true),
 })
 
 export const emailLoginSchema = z.object({
@@ -34,20 +42,16 @@ export const emailSignupSchema = z.object({
   username: displayNameSchema, // Will become display_name in the database
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  gender: z.enum(["male", "female", "other", "prefer_not_to_say"], {
-    required_error: "Please select a gender",
-  }),
   age: z
-    .number({ required_error: "Please select your age" })
+    .number()
     .int()
     .min(18, "You must be at least 18 years old")
     .max(100, "Please enter a valid age"),
-  ageConfirmed: z.literal(true, {
-    errorMap: () => ({ message: "You must confirm you are 18 or older" }),
-  }),
-  termsAccepted: z.literal(true, {
-    errorMap: () => ({ message: "You must accept the terms of service" }),
-  }),
+  vibe: vibeSchema,
+  interests: interestTagsSchema.optional(),
+  statusLine: statusLineSchema,
+  ageConfirmed: z.literal(true),
+  termsAccepted: z.literal(true),
 })
 
 export const upgradeAccountSchema = z.object({

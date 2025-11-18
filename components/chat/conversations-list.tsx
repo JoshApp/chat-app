@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDistanceToNow } from "date-fns"
 import type { Conversation, Message, User } from "@/lib/types/database"
 import { TwemojiText } from "@/components/ui/twemoji-text"
+import { MessageSquare } from "lucide-react"
 
 interface ConversationWithDetails extends Conversation {
   other_user: User
@@ -151,9 +152,12 @@ export function ConversationsList({ onConversationClick }: ConversationsListProp
   if (conversations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-        <p className="text-muted-foreground">No conversations yet</p>
-        <p className="text-sm text-muted-foreground mt-2">
-          Start chatting with someone from the Online tab!
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+          <MessageSquare className="w-8 h-8 text-primary/60" />
+        </div>
+        <p className="text-lg font-semibold mb-1">No conversations yet</p>
+        <p className="text-xs text-muted-foreground max-w-sm">
+          Head to Discover to find someone who vibes with you. When you both spark, you can chat here
         </p>
       </div>
     )
@@ -170,7 +174,7 @@ export function ConversationsList({ onConversationClick }: ConversationsListProp
             <button
               key={conversation.id}
               onClick={() => onConversationClick(conversation)}
-              className="w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors relative"
+              className="w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors relative"
             >
               {/* Blue dot indicator for unread */}
               {hasUnread && (

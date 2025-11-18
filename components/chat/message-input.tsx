@@ -231,17 +231,15 @@ export function MessageInput({
         />
       )}
 
-      <div className="p-4">
+      <div className="p-3">
         {/* Emoji Picker */}
         {showEmojiPicker && (
           <div
             ref={emojiPickerRef}
-            className="absolute bottom-20 right-4 z-50"
+            className="absolute bottom-20 right-3 z-50"
           >
             <EmojiPicker
               onEmojiClick={handleEmojiClick}
-              emojiStyle="twitter"
-              theme="dark"
               width={350}
               height={400}
             />

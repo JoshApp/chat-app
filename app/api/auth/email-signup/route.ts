@@ -60,9 +60,12 @@ export async function POST(request: NextRequest) {
         username,
         display_name: displayName,
         email: validatedData.email,
-        gender: validatedData.gender,
         age: validatedData.age,
+        vibe: validatedData.vibe,
+        interests: validatedData.interests || [],
+        status_line: validatedData.statusLine || null,
         is_guest: false,
+        email_verified: false, // Email verification will be handled by Supabase Auth
         country_code: countryCode,
         age_verified_at: new Date().toISOString(),
       })

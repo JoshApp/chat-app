@@ -13,7 +13,9 @@ interface OnlineUsersListProps {
   onUserClick: (user: PresenceUser) => void
 }
 
-function getGenderBackgroundClass(gender: string): string {
+function getGenderBackgroundClass(gender: string | undefined): string {
+  if (!gender) return "bg-purple-500/10"
+
   switch (gender.toLowerCase()) {
     case "female":
     case "woman":
@@ -26,7 +28,9 @@ function getGenderBackgroundClass(gender: string): string {
   }
 }
 
-function getGenderSymbol(gender: string): { symbol: string; color: string } | null {
+function getGenderSymbol(gender: string | undefined): { symbol: string; color: string } | null {
+  if (!gender) return null
+
   switch (gender.toLowerCase()) {
     case "female":
     case "woman":
@@ -58,20 +62,18 @@ export function OnlineUsersList({ onlineUsers, onUserClick }: OnlineUsersListPro
       <div className="p-4 space-y-2">
         {onlineUsers.map((onlineUser) => {
           const isCurrentUser = user && onlineUser.user_id === user.id
-          const genderBg = getGenderBackgroundClass(onlineUser.gender)
-          const genderSymbol = getGenderSymbol(onlineUser.gender)
 
           return (
             <button
               key={onlineUser.user_id}
               onClick={() => !isCurrentUser && onUserClick(onlineUser)}
-              disabled={isCurrentUser}
+              disabled={!!isCurrentUser}
               className={cn(
                 "w-full flex items-center gap-3 p-3 rounded-lg transition-colors",
-                genderBg,
+                "bg-secondary/50 hover:bg-secondary",
                 isCurrentUser
                   ? "opacity-60 cursor-default"
-                  : "hover:brightness-110 cursor-pointer"
+                  : "cursor-pointer"
               )}
             >
               <div className="relative">
@@ -90,14 +92,13 @@ export function OnlineUsersList({ onlineUsers, onUserClick }: OnlineUsersListPro
                   )}
                 </div>
                 <div className="text-sm text-muted-foreground flex items-center gap-1.5">
-                  {genderSymbol && (
-                    <span className={cn("font-semibold text-base", genderSymbol.color)}>
-                      {genderSymbol.symbol}
-                    </span>
+                  <span>{onlineUser.age} years old</span>
+                  {onlineUser.vibe && (
+                    <>
+                      <span>•</span>
+                      <span className="capitalize">{onlineUser.vibe}</span>
+                    </>
                   )}
-                  <span>
-                    {onlineUser.age} • {onlineUser.gender === "prefer_not_to_say" ? "Prefer not to say" : onlineUser.gender}
-                  </span>
                 </div>
               </div>
             </button>

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     // Sign in anonymously first to get the user ID
     const { data: authData, error: authError } = await supabase.auth.signInAnonymously()
 
-    if (authError) {
+    if (authError || !authData.user) {
       return NextResponse.json(
         { error: "Failed to create guest account" },
         { status: 500 }
@@ -43,8 +43,10 @@ export async function POST(request: NextRequest) {
         id: authData.user.id,
         username,
         display_name: displayName,
-        gender: validatedData.gender,
         age: validatedData.age,
+        vibe: validatedData.vibe,
+        interests: validatedData.interests || [],
+        status_line: validatedData.statusLine || null,
         is_guest: true,
         country_code: countryCode,
         age_verified_at: new Date().toISOString(),

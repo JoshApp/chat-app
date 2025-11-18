@@ -5,18 +5,19 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { OnlineUsersList } from "@/components/chat/online-users-list"
+import { UserProfileModal } from "@/components/lobby/user-profile-modal"
 import { ConversationsList } from "@/components/chat/conversations-list"
 import { ChatView } from "@/components/chat/chat-view"
 import { UserAvatar } from "@/components/chat/user-avatar"
 import { NotificationBadge } from "@/components/notifications/notification-badge"
+import { DiscoverFeed } from "@/components/discover"
 import { MessageSquare, Users, Shield, Settings, LogOut, Edit2, Check, X, Bell, BellOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { usePresence, type PresenceUser } from "@/lib/hooks/use-presence"
 import { useNotifications } from "@/lib/contexts/notification-context"
 import toast from "react-hot-toast"
 
-type Tab = "online" | "messages" | "safety" | "settings"
+type Tab = "discover" | "chat" | "safety" | "settings"
 
 export default function AppPage() {
   const { user, authUser, loading, signOut, refreshUser } = useAuth()
@@ -24,15 +25,17 @@ export default function AppPage() {
   const { totalUnread, isMuted, toggleMute } = useNotifications()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState<Tab>("online")
+  const [activeTab, setActiveTab] = useState<Tab>("discover")
   const [selectedConversation, setSelectedConversation] = useState<{
     id: string
-    otherUser: { id: string; username: string; age: number; gender: string; country_code: string | null; show_country_flag: boolean }
+    otherUser: { id: string; username: string; age: number; vibe?: string | null; country_code: string | null; show_country_flag: boolean }
   } | null>(null)
+  const [selectedUserForModal, setSelectedUserForModal] = useState<PresenceUser | null>(null)
   const [isMobileView, setIsMobileView] = useState(false)
   const [isEditingDisplayName, setIsEditingDisplayName] = useState(false)
   const [newDisplayName, setNewDisplayName] = useState("")
   const [isSavingDisplayName, setIsSavingDisplayName] = useState(false)
+  const [incomingSparkCount, setIncomingSparkCount] = useState(0)
 
   useEffect(() => {
     if (!loading && !authUser) {
@@ -67,12 +70,11 @@ export default function AppPage() {
                 id: data.conversation.other_user.id,
                 username: data.conversation.other_user.username,
                 age: data.conversation.other_user.age,
-                gender: data.conversation.other_user.gender,
+                vibe: data.conversation.other_user.vibe,
                 country_code: data.conversation.other_user.country_code,
                 show_country_flag: data.conversation.other_user.show_country_flag,
               },
             })
-            setActiveTab("online")
           }
         })
         .catch(error => {
@@ -84,43 +86,38 @@ export default function AppPage() {
     }
   }, [searchParams, user])
 
-  const handleUserClick = async (presenceUser: PresenceUser) => {
-    try {
-      // Prevent chatting with yourself (this should never happen due to UI blocking)
-      if (user && presenceUser.user_id === user.id) {
-        return
-      }
+  const handleUserClick = (presenceUser: PresenceUser) => {
+    // Open profile modal instead of directly creating conversation
+    setSelectedUserForModal(presenceUser)
+  }
 
+  const handleStartChat = async (userId: string) => {
+    try {
       // Create or get conversation
       const response = await fetch("/api/conversations/get-or-create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ otherUserId: presenceUser.user_id }),
+        body: JSON.stringify({ otherUserId: userId }),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to create conversation")
+        const data = await response.json()
+        throw new Error(data.error || "Failed to create conversation")
       }
 
       const data = await response.json()
 
-      setSelectedConversation({
-        id: data.conversationId,
-        otherUser: {
-          id: presenceUser.user_id,
-          username: presenceUser.display_name,
-          age: presenceUser.age,
-          gender: presenceUser.gender,
-          country_code: presenceUser.country_code,
-          show_country_flag: presenceUser.show_country_flag,
-        },
-      })
+      // Switch to chat tab for seamless flow
+      setActiveTab("chat")
 
-      // Update URL
+      // Update URL and let the useEffect handle loading the conversation
       router.push(`/app?conversation=${data.conversationId}`)
+
+      // Close modal if open
+      setSelectedUserForModal(null)
     } catch (error) {
       console.error("Error starting conversation:", error)
-      toast.error("Failed to start conversation")
+      toast.error(error instanceof Error ? error.message : "Failed to start conversation")
     }
   }
 
@@ -129,13 +126,16 @@ export default function AppPage() {
       id: conversation.id,
       otherUser: {
         id: conversation.other_user.id,
-        username: conversation.other_user.username,
+        username: conversation.other_user.display_name,
         age: conversation.other_user.age,
-        gender: conversation.other_user.gender,
+        vibe: conversation.other_user.vibe,
         country_code: conversation.other_user.country_code,
         show_country_flag: conversation.other_user.show_country_flag,
       },
     })
+
+    // Switch to chat tab
+    setActiveTab("chat")
 
     // Update URL
     router.push(`/app?conversation=${conversation.id}`)
@@ -222,13 +222,13 @@ export default function AppPage() {
   }
 
   const tabs = [
-    { id: "online" as Tab, label: "Online", icon: Users },
-    { id: "messages" as Tab, label: "Messages", icon: MessageSquare },
+    { id: "discover" as Tab, label: "Discover", icon: Users },
+    { id: "chat" as Tab, label: "Chat", icon: MessageSquare },
     { id: "safety" as Tab, label: "Safety", icon: Shield },
     { id: "settings" as Tab, label: "Settings", icon: Settings },
   ]
 
-  const showChat = selectedConversation && (activeTab === "messages" || activeTab === "online")
+  const showChat = selectedConversation && activeTab === "chat"
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -243,12 +243,12 @@ export default function AppPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setActiveTab("messages")}
+              onClick={() => setActiveTab("chat")}
               onContextMenu={(e) => {
                 e.preventDefault()
                 toggleMute()
               }}
-              title={totalUnread > 0 ? `${totalUnread} unread messages` : "Messages"}
+              title={totalUnread > 0 ? `${totalUnread} unread messages` : "Chat"}
             >
               {isMuted ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
             </Button>
@@ -277,16 +277,21 @@ export default function AppPage() {
                 className="w-full justify-start relative"
                 onClick={() => {
                   setActiveTab(tab.id)
-                  if (tab.id !== "messages" && tab.id !== "online") {
+                  if (tab.id !== "chat" && tab.id !== "discover") {
                     setSelectedConversation(null)
                   }
                 }}
               >
                 <tab.icon className="h-5 w-5 mr-2" />
                 {tab.label}
-                {tab.id === "messages" && totalUnread > 0 && (
+                {tab.id === "chat" && totalUnread > 0 && (
                   <span className="ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-red-500 text-white text-xs font-bold rounded-full">
                     {totalUnread > 99 ? "99+" : totalUnread}
+                  </span>
+                )}
+                {tab.id === "discover" && incomingSparkCount > 0 && (
+                  <span className="ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-primary text-primary-foreground text-xs font-bold rounded-full">
+                    {incomingSparkCount}
                   </span>
                 )}
               </Button>
@@ -299,12 +304,21 @@ export default function AppPage() {
           {/* Left Panel - List View */}
           <div
             className={cn(
-              "flex-1 lg:max-w-md border-r",
+              "flex-1 border-r",
+              activeTab === "chat" && "lg:w-80 lg:flex-none",
+              activeTab === "discover" && "lg:max-w-4xl",
               isMobileView && showChat && "hidden"
             )}
           >
-            {activeTab === "online" && <OnlineUsersList onlineUsers={onlineUsers} onUserClick={handleUserClick} />}
-            {activeTab === "messages" && (
+            {activeTab === "discover" && (
+              <DiscoverFeed
+                onlineUsers={onlineUsers}
+                onUserClick={handleUserClick}
+                onStartChat={handleStartChat}
+                onIncomingCountChange={setIncomingSparkCount}
+              />
+            )}
+            {activeTab === "chat" && (
               <ConversationsList onConversationClick={handleConversationClick} />
             )}
             {activeTab === "safety" && (
@@ -367,10 +381,6 @@ export default function AppPage() {
                   <div>
                     <p className="text-sm font-medium">Age</p>
                     <p className="text-sm text-muted-foreground">{user.age}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Gender</p>
-                    <p className="text-sm text-muted-foreground">{user.gender}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium mb-2">Country Flag</p>
@@ -451,7 +461,7 @@ export default function AppPage() {
             key={tab.id}
             onClick={() => {
               setActiveTab(tab.id)
-              if (tab.id !== "messages" && tab.id !== "online") {
+              if (tab.id !== "chat" && tab.id !== "discover") {
                 setSelectedConversation(null)
               }
             }}
@@ -462,14 +472,25 @@ export default function AppPage() {
           >
             <div className="relative">
               <tab.icon className="h-5 w-5" />
-              {tab.id === "messages" && (
+              {tab.id === "chat" && (
                 <NotificationBadge count={totalUnread} className="-top-2 -right-2" />
+              )}
+              {tab.id === "discover" && incomingSparkCount > 0 && (
+                <NotificationBadge count={incomingSparkCount} className="-top-2 -right-2" />
               )}
             </div>
             <span className="text-xs">{tab.label}</span>
           </button>
         ))}
       </nav>
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        user={selectedUserForModal}
+        isOpen={selectedUserForModal !== null}
+        onClose={() => setSelectedUserForModal(null)}
+        onStartChat={handleStartChat}
+      />
     </div>
   )
 }

@@ -5,12 +5,17 @@ import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/lib/contexts/auth-context"
 import type { RealtimeChannel } from "@supabase/supabase-js"
 
+import type { Vibe } from "@/lib/types/database"
+
 export interface PresenceUser {
   user_id: string
   username: string // Keep for backward compatibility temporarily
   display_name: string
-  gender: string
   age: number
+  vibe: Vibe | null
+  interests: string[]
+  status_line: string | null
+  premium_tier: string
   country_code: string | null
   show_country_flag: boolean
   online_at: string
@@ -59,8 +64,11 @@ export function usePresence() {
             user_id: user.id,
             username: user.display_name, // For backward compatibility
             display_name: user.display_name,
-            gender: user.gender,
             age: user.age,
+            vibe: user.vibe,
+            interests: user.interests || [],
+            status_line: user.status_line,
+            premium_tier: user.premium_tier,
             country_code: user.country_code,
             show_country_flag: user.show_country_flag,
             online_at: new Date().toISOString(),

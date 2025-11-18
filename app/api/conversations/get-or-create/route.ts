@@ -21,6 +21,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // Check for mutual spark before allowing conversation creation
+    const { data: hasMutualSpark, error: sparkError } = await supabase.rpc(
+      "check_mutual_spark",
+      {
+        user_a: authUser.id,
+        user_b: otherUserId,
+      }
+    )
+
+    if (sparkError) {
+      console.error("Error checking mutual spark:", sparkError)
+      return NextResponse.json(
+        { error: "Failed to verify mutual spark" },
+        { status: 500 }
+      )
+    }
+
+    if (!hasMutualSpark) {
+      return NextResponse.json(
+        { error: "Mutual spark required to start a conversation" },
+        { status: 403 }
+      )
+    }
+
     // Use the database function to get or create conversation
     const { data, error } = await supabase.rpc("get_or_create_conversation", {
       user1: authUser.id,
@@ -31,6 +55,22 @@ export async function POST(request: NextRequest) {
       console.error("Error getting/creating conversation:", error)
       return NextResponse.json({ error: "Failed to create conversation" }, { status: 500 })
     }
+
+    console.log("get_or_create_conversation returned:", data)
+
+    // Verify the conversation exists by fetching it
+    const { data: conversation, error: fetchError } = await supabase
+      .from("conversations")
+      .select("*")
+      .eq("id", data)
+      .single()
+
+    if (fetchError || !conversation) {
+      console.error("Conversation not found after creation:", fetchError)
+      return NextResponse.json({ error: "Failed to verify conversation" }, { status: 500 })
+    }
+
+    console.log("Conversation verified:", conversation.id)
 
     return NextResponse.json({ conversationId: data })
   } catch (error) {

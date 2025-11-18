@@ -1,0 +1,5 @@
+export { OnboardingWizard, type OnboardingData } from "./onboarding-wizard"
+export { Step1BasicInfo } from "./step-1-basic-info"
+export { Step2Vibe } from "./step-2-vibe"
+export { Step3Interests } from "./step-3-interests"
+export { Step4Status } from "./step-4-status"
